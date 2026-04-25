@@ -35,6 +35,8 @@
 │   ├── processed               # Очищенные и обработанные данные
 │   └── raw                     # Исходные файлы
 ├── models                      # Сохранённые модели 
+│   ├── baseline_logreg.joblib  # Baseline LogisticRegression (создаётся modeling.py)
+│   └── best_voting.joblib      # VotingClassifier LogReg + RandomForest (создаётся modeling.py)
 ├── notebooks
 │   ├── 01_eda.ipynb            # EDA
 │   ├── 02_baseline.ipynb       # Baseline-модель
@@ -68,6 +70,20 @@ python -m venv .venv
 # 3. Установить зависимости
 pip install -r requirements.txt
 ```
+
+### Обучение моделей
+
+Из корня репозитория:
+```bash
+python -m src.modeling
+```
+
+Скрипт читает `data/raw/KaggleV2-May-2016.csv`, сохраняет очищенные данные в `data/processed/processed.csv` и обучает две модели:
+
+- `models/baseline_logreg.joblib` — baseline LogisticRegression
+- `models/best_voting.joblib` — VotingClassifier (LogReg + RandomForest)
+
+Файлы `.joblib` игнорируются git — артефакты генерируются локально.
 
 ## Данные
 - `data/raw/` — исходные файлы
