@@ -10,6 +10,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from lightgbm import LGBMClassifier
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import (
     GradientBoostingClassifier,
@@ -202,6 +203,26 @@ def tune_hist_gradient_boosting(preprocessor, X, y, cv=None):
         'model__learning_rate': [0.05, 0.1, 0.15],
         'model__max_depth': [7, 10, 12],
         'model__l2_regularization': [0.0, 0.01],
+    }
+    search = GridSearchCV(pipeline, param_grid, cv=cv, scoring='f1', n_jobs=-1)
+    search.fit(X, y)
+    return search
+
+
+def tune_lightgbm(preprocessor, X, y, cv=None):
+    if cv is None:
+        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+
+    pipeline = build_model_pipeline(
+        preprocessor,
+        LGBMClassifier(random_state=RANDOM_STATE, n_jobs=-1, verbose=-1),
+    )
+    param_grid = {
+        'model__n_estimators': [200, 300],
+        'model__learning_rate': [0.05, 0.1],
+        'model__max_depth': [5, 7],
+        'model__num_leaves': [31, 63],
+        'model__class_weight': ['balanced'],
     }
     search = GridSearchCV(pipeline, param_grid, cv=cv, scoring='f1', n_jobs=-1)
     search.fit(X, y)
