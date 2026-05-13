@@ -15,12 +15,14 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     # Фильтрация
     df = df[df['Age'] >= 0]
     df = df[df['ScheduledDay'] <= df['AppointmentDay']]
+    df = df.drop_duplicates()
 
     # Target
     df['No-show'] = df['No-show'].map({'No': 0, 'Yes': 1})
 
     # Feature engineering
     df['waiting_days'] = (df['AppointmentDay'] - df['ScheduledDay']).dt.days
+    df['waiting_days'] = df['waiting_days'].clip(0, 100)
     df['appointment_weekday'] = df['AppointmentDay'].dt.weekday
     df['scheduled_weekday'] = df['ScheduledDay'].dt.weekday
     df['is_weekend'] = df['appointment_weekday'].isin([5, 6]).astype(int)

@@ -1,5 +1,5 @@
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/kOqwghv0)
-# ML Project — [Название проекта]
+# ML Project -- [Название проекта]
 
 **Студент:** [Алцыбеев Семен Владимирович / Student АБ-123456]
 
@@ -26,6 +26,27 @@
 **Датасет:** [Medical Appointment No Shows, https://www.kaggle.com/datasets/joniarroba/noshowappointments?resource=download]
 
 **Целевая метрика:** [Accuracy / F1 / RMSE / ...]
+
+Датасет искался на Kaggle по тематике здравоохранения и поведения пациентов: интересовала практическая задача бинарной классификации, где предсказание может приносить реальную пользу клинике (снижение потерь от незаполненных слотов, адресные напоминания). Из нескольких кандидатов выбран **Medical Appointment No Shows** по следующим причинам:
+- Содержит реальные данные из бразильской системы здравоохранения (~110 тыс. записей о приёмах) -- достаточный объём для устойчивого обучения и валидации.
+- В нем отражен богатый мир признаков: демография (возраст, пол), социально-экономический статус (Scholarship), медицинская история (Hipertension, Diabetes, Alcoholism, Handcap), поведенческий фактор (SMS_received) и временны́е метки (ScheduledDay, AppointmentDay) -- это позволяет делать осмысленный feature engineering (`waiting_days`, день недели и т.д.).
+- Классы в нем умеренно несбалансированы, что делает задачу нетривиальной, но не вырожденной.
+- Данные из Kaggle доступны без ограничений
+
+- **Объём:** 110 527 строк × 14 столбцов
+- **Целевая переменная:** `No-show` (Yes / No)
+- **Период:** записи о приёмах за апрель–июнь 2016 года
+- **Столбцы:**
+  - `PatientId`, `AppointmentID` -- идентификаторы
+  - `Gender` -- пол (M/F)
+  - `ScheduledDay` -- дата и время записи на приём
+  - `AppointmentDay` -- дата самого приёма
+  - `Age` -- возраст пациента
+  - `Neighbourhood` -- район проживания
+  - `Scholarship` -- участие в программе соц. поддержки Bolsa Família (0/1)
+  - `Hipertension`, `Diabetes`, `Alcoholism`, `Handcap` -- медицинские флаги
+  - `SMS_received` -- было ли отправлено SMS-напоминание (0/1)
+  - `No-show` -- целевая метка (Yes -- не пришёл, No -- пришёл)
 
 
 ## Структура репозитория
@@ -56,7 +77,6 @@
 
 ## Запуск
 
-Этот блок замените способом запуска вашего сервиса.
 ```bash
 # 1. Клонировать репозиторий
 git clone https://github.com/hsemlcourse/hseml-group-project-semyon_a-1
@@ -80,26 +100,55 @@ python -m src.modeling
 
 Скрипт читает `data/raw/KaggleV2-May-2016.csv`, сохраняет очищенные данные в `data/processed/processed.csv` и обучает две модели:
 
-- `models/baseline_logreg.joblib` — baseline LogisticRegression
-- `models/best_voting.joblib` — VotingClassifier (LogReg + RandomForest)
+- `models/baseline_logreg.joblib` -- baseline LogisticRegression
+- `models/best_voting.joblib` -- VotingClassifier (LogReg + RandomForest)
 
-Файлы `.joblib` игнорируются git — артефакты генерируются локально.
+Файлы `.joblib` игнорируются git -- артефакты генерируются локально.
 
 ## Данные
-- `data/raw/` — исходные файлы
-- `data/processed/` — очищенные данные после:
-  - удаления аномалий (Age < 0, некорректные даты)
-  - feature engineering (waiting_days, weekday, is_weekend и др.)
+
+### Обработка и подготовка
+- `data/raw/` -- исходные файлы
+- `data/processed/` -- очищенные данные после:
+  - **Очистки:** удаления аномалий (Age < 0 -- 1 строка, ScheduledDay > AppointmentDay -- 38,567 строк, дубликаты)
+  - **Feature engineering:** исходных 14 признаков + 4 новых:
+    - `waiting_days` = дни между записью и приёмом (ключевой фактор)
+    - `appointment_weekday` = день недели приёма, где 0 -- понедельник, 6 -- воскресенье
+    - `scheduled_weekday` = день недели записи
+    - `is_weekend` = флаг выходного дня для приёма
   - подготовки к обучению моделей
+  
+Итого после очистки: **71,959 строк** (70% явились, 30% не явились). После one-hot encoding Neighbourhood: **~96 признаков**.
+
+### Защита от утечки данных (data leakage)
+Удалены потенциально опасные для обучения столбцы: `PatientId`, `AppointmentID`, `ScheduledDay`, `AppointmentDay` -- они содержат информацию, недоступную на момент решения о профилактике.
+
+**Train/Test split:** 80/20, группировка по PatientId (один пациент целиком в train или test). **Cross-validation:** 5-fold StratifiedKFold для контроля переобучения.
 
 ## Результаты
-Здесь коротко выпишите результаты.
+
+### Выбор метрик
+- **F1-score** (приоритет): баланс между Precision и Recall при дисбалансе классов (70/30). Отвергнута Accuracy -- она даёт ложное впечатление качества (67% точность при 70% базового уровня).
+- **Recall**: способность поймать максимум случаев no-show для адресной профилактики.
+- **Precision**: минимизация ложных тревог (лишние напоминания).
+- **ROC-AUC**: independent от порога классификации, для вероятностной оценки.
+
+### Качество моделей
+
 | Модель            | F1-score | ROC-AUC  | Примечание                                          |
 | ----------------- | -------- | -------- | --------------------------------------------------- |
 | Baseline (LogReg) | 0.41     | 0.57     | Pipeline + scaling + class_weight                   |
-| Лучшая (Voting)   | **0.44** | **0.61** | Ансамбль (LogReg + RandomForest), небольшой прирост |
+| Лучшая (Voting)   | **0.44** | **0.61** | Ансамбль (LogReg + RandomForest), +7% F1, +7% AUC  |
 
-- Основные факторы No-show: waiting_days, возраст, SMS-напоминания
+Улучшение modest, но стабильный результат на CV и test set.
+
+### Ключевые факторы No-show
+
+По важности признаков (Correlation + RF feature importance):
+1. **waiting_days** (время ожидания) -- сильнейший фактор, ведь пациенты, ждущие дольше 2 недель, пропускают приём в 2 раза чаще
+2. **Age** (возраст) -- молодые пациенты, кому по 18–35 лет, no-show в 3 раза чаще, чем у пожилых
+3. **Neighbourhood** (район) -- в силу социально-экономических различий в бедных районах выше риск неприхода
+4. **SMS_received** -- парадокс: SMS связана с выше no-show (с другой стороны, организация уже могла отправлять SMS пациентам высокого риска)
 
 
 ## Отчёт
